@@ -1,0 +1,82 @@
+#!/bin/bash
+THIS=${0##*/}
+CMD=$1
+HOST=$2
+USER=guest
+main () {
+    case ${CMD}. in 
+         check.|mount.|unmount.)
+             API_$CMD
+             ;;
+         *)
+             usage
+             ;;
+    esac
+}
+
+usage() {
+cat << HEREDOC
+Usage:
+    ${THIS} check       -- check all arfs are mounted
+    ${THIS} unmount     -- unmount all
+    ${THIS} mount HOST  -- mount arfs from HOST
+
+Example:
+    ${THIS} mount arf.local
+HEREDOC
+}
+
+sanity () {
+    local MOUNT=$(mdir)
+    [ -d ${MOUNT} ] && return
+    echo "[busy.arf]: mount point [$MOUNT] does not exist."
+    exit
+}
+
+_mount () {
+    local share=$1
+    local point=$(mnt4name $1)
+    mounted4point ${point} && return 0
+    sudo mkdir -p ${point}
+    echo }} sudo mount -t smbfs //${USER}:@${HOST}/${share} ${point}
+    sudo mount -t smbfs //${USER}:@${HOST}/${share} ${point}
+}
+
+mnt4name () { echo $(mdir)/arf.${1} ; }
+mounted4point () { mount | grep ${1} > /dev/null ; }
+
+API_mount () {
+    sanity
+    _mount TOSHIBA
+    _mount share
+}
+API_unmount () {
+    local MOUNT=$(mdir)
+    sanity
+    sudo umount ${MOUNT}/arf.*
+    sudo rm -rf ${MOUNT}/arf.*
+}
+API_check () {
+    sanity
+    for name in share TOSHIBA; do
+        mounted4point $(mnt4name $name) && continue
+        #mount=$(busy.host.mount)
+        echo "there are unmounted arf shares."
+        echo "try: $THIS mount arf.local"
+        return 1
+    done
+}
+all_mounted () {
+    mounted4point $(mnt4name TOSHIBA) || return 1
+    mounted4point $(mnt4name share) || return 1
+    return 0
+}
+
+mdir () {
+    # mount directory
+    for mount in /media /Volumes; do
+        [ -d $mount ] && echo $mount && exit
+    done
+}
+
+main $*
